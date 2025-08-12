@@ -4,7 +4,10 @@ on:
   pull_request:
     branches:
       - main
-
+    types:
+      - opened       # PR created
+      - synchronize  # commits pushed to PR branch
+      - reopened     # PR reopened
 jobs:
   run-cypress-in-jenkins:
     runs-on: ubuntu-latest
