@@ -9,52 +9,54 @@ jobs:
   run-cypress-in-jenkins:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Jenkins Cypress Job
-        id: jenkins
-        uses: appleboy/jenkins-action@v1.0.0
-        with:
-          url: ${{ secrets.JENKINS_URL }}
-          user: ${{ secrets.JENKINS_USER }}
-          token: ${{ secrets.JENKINS_TOKEN }}
-          job: 'cypress-demo'
-          wait: true
-          insecure: true
-
-      - name: Get Jenkins Build Info
-        id: buildinfo
+      - name: Trigger Jenkins Job
+        id: trigger
         run: |
-          # Get the last build URL
-          build_url="${{ secrets.JENKINS_URL }}/job/cypress-demo/lastBuild"
-          echo "build_url=$build_url" >> $GITHUB_OUTPUT
+          # Start Jenkins job
+          curl -s -X POST \
+            -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" \
+            "${{ secrets.JENKINS_URL }}/job/cypress-demo/build" -i
 
-          # Get build result
-          result=$(curl -s -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" \
-            "$build_url/api/json" | jq -r '.result')
-          echo "result=$result" >> $GITHUB_OUTPUT
+          # Get the last build number
+          build_num=$(curl -s -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" \
+            "${{ secrets.JENKINS_URL }}/job/cypress-demo/api/json" | jq -r '.lastBuild.number')
 
-          # Fail PR if Jenkins failed
-          if [ "$result" != "SUCCESS" ]; then
-            exit 1
-          fi
+          echo "build_num=$build_num" >> $GITHUB_OUTPUT
+          echo "build_url=${{ secrets.JENKINS_URL }}/job/cypress-demo/$build_num" >> $GITHUB_OUTPUT
 
-      - name: Post Cypress Report Link to PR
+      - name: Wait for Jenkins Job to Finish
+        id: wait
+        run: |
+          build_num="${{ steps.trigger.outputs.build_num }}"
+          build_url="${{ steps.trigger.outputs.build_url }}"
+
+          while true; do
+            building=$(curl -s -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" \
+              "${{ secrets.JENKINS_URL }}/job/cypress-demo/$build_num/api/json" | jq -r '.building')
+            result=$(curl -s -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" \
+              "${{ secrets.JENKINS_URL }}/job/cypress-demo/$build_num/api/json" | jq -r '.result')
+
+            if [ "$building" = "false" ]; then
+              echo "result=$result" >> $GITHUB_OUTPUT
+              [ "$result" != "SUCCESS" ] && exit 1
+              break
+            fi
+            sleep 10
+          done
+
+      - name: Post Cypress Results to PR
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }} # Use GH_PAT if fork PRs
           script: |
-            const buildUrl = "${{ steps.buildinfo.outputs.build_url }}";
-            const result = "${{ steps.buildinfo.outputs.result }}";
             const prNumber = context.payload.pull_request.number;
-
-            const commentBody = `
-            ### 🧪 Cypress Test Results
-            **Status:** ${result}
-            **Jenkins Build:** [View here](${buildUrl})
-            `;
+            const buildUrl = "${{ steps.trigger.outputs.build_url }}";
+            const result = "${{ steps.wait.outputs.result }}";
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
-              body: commentBody
+              body: `### 🧪 Cypress Test Results\n**Status:** ${result}\n**Jenkins Build:** [View here](${buildUrl})`
             });
