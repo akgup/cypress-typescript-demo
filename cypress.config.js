@@ -7,7 +7,6 @@ module.exports = defineConfig({
       allureWriter(on, config);
       return config;
     },
-    baseUrl: 'http://localhost:3000', // change if needed
     reporterOptions: {
       reportDir: 'cypress/reports/mochawesome',
       overwrite: false,
