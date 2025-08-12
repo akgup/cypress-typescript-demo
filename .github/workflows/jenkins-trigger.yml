@@ -5,9 +5,12 @@ on:
     branches:
       - main
     types:
-      - opened       # PR created
-      - synchronize  # commits pushed to PR branch
-      - reopened     # PR reopened
+      - opened
+      - synchronize
+      - reopened
+
+  workflow_dispatch:  # 👈 allows manual trigger from GitHub UI
+
 jobs:
   run-cypress-in-jenkins:
     runs-on: ubuntu-latest
