@@ -1,4 +1,4 @@
-name: Trigger Jenkins Job
+name: Trigger Jenkins Job and Wait
 
 on:
   push:
@@ -9,12 +9,12 @@ jobs:
   trigger-jenkins:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Jenkins Job
+      - name: Trigger Jenkins Job and Wait
         uses: appleboy/jenkins-action@v1.0.0
         with:
           url: ${{ secrets.JENKINS_URL }}
           user: ${{ secrets.JENKINS_USER }}
           token: ${{ secrets.JENKINS_TOKEN }}
           job: 'cypress-demo'
-          # Optional: Pass parameters to the Jenkins job
-          # args: '{"PARAM1": "value1", "PARAM2": "value2"}'
+          wait: true # 👈 Wait until job completes
+          insecure: true # if you don't have a trusted SSL cert
