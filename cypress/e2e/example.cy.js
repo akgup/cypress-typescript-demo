@@ -6,6 +6,6 @@ describe('template spec', () => {
     const title = 'Kitchen Sink'
     const titleElement = cy.get('h1').first()
     titleElement.should('include.text', title)
-    // added test comment3
+    // added test comment4
   })
 })
