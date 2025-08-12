@@ -48,7 +48,7 @@ jobs:
         if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }} # Use GH_PAT if fork PRs
+          github-token: ${{ secrets.GH_PAT }} # Use GH_PAT if fork PRs
           script: |
             const prNumber = context.payload.pull_request.number;
             const buildUrl = "${{ steps.trigger.outputs.build_url }}";
