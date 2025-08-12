@@ -1,23 +1,60 @@
-name: Trigger Jenkins Job on PR Merge
+name: PR Cypress Check via Jenkins
 
 on:
   pull_request:
     branches:
       - main
-    types:
-      - closed
 
 jobs:
-  trigger-jenkins:
-    if: github.event.pull_request.merged == true
+  run-cypress-in-jenkins:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Jenkins Job and Wait
+      - name: Trigger Jenkins Cypress Job
+        id: jenkins
         uses: appleboy/jenkins-action@v1.0.0
         with:
           url: ${{ secrets.JENKINS_URL }}
           user: ${{ secrets.JENKINS_USER }}
           token: ${{ secrets.JENKINS_TOKEN }}
           job: 'cypress-demo'
-          wait: true  # wait for Jenkins to finish before marking commit status
-          insecure: true # only if Jenkins uses self-signed SSL
+          wait: true
+          insecure: true
+
+      - name: Get Jenkins Build Info
+        id: buildinfo
+        run: |
+          # Get the last build URL
+          build_url="${{ secrets.JENKINS_URL }}/job/cypress-demo/lastBuild"
+          echo "build_url=$build_url" >> $GITHUB_OUTPUT
+
+          # Get build result
+          result=$(curl -s -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" \
+            "$build_url/api/json" | jq -r '.result')
+          echo "result=$result" >> $GITHUB_OUTPUT
+
+          # Fail PR if Jenkins failed
+          if [ "$result" != "SUCCESS" ]; then
+            exit 1
+          fi
+
+      - name: Post Cypress Report Link to PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const buildUrl = "${{ steps.buildinfo.outputs.build_url }}";
+            const result = "${{ steps.buildinfo.outputs.result }}";
+            const prNumber = context.payload.pull_request.number;
+
+            const commentBody = `
+            ### 🧪 Cypress Test Results
+            **Status:** ${result}
+            **Jenkins Build:** [View here](${buildUrl})
+            `;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: commentBody
+            });
