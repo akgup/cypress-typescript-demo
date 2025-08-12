@@ -1,12 +1,15 @@
-name: Trigger Jenkins Job and Wait
+name: Trigger Jenkins Job on PR Merge
 
 on:
-  push:
+  pull_request:
     branches:
       - main
+    types:
+      - closed
 
 jobs:
   trigger-jenkins:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Jenkins Job and Wait
@@ -16,5 +19,5 @@ jobs:
           user: ${{ secrets.JENKINS_USER }}
           token: ${{ secrets.JENKINS_TOKEN }}
           job: 'cypress-demo'
-          wait: true # 👈 Wait until job completes
-          insecure: true # if you don't have a trusted SSL cert
+          wait: true  # wait for Jenkins to finish before marking commit status
+          insecure: true # only if Jenkins uses self-signed SSL
